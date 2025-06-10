@@ -1,0 +1,158 @@
+
+Criar Ambiente virtual Python (não editar)
+
+Liste as versões registradas
+py -0p
+
+Crie o venv apontando para o 3.11
+py -3.11 -m venv .venv
+
+Ative o ambiente
+.\.venv\Scripts\Activate.ps1
+
+Confirme
+python --version
+
+Desativar o ambiente atual
+deactivate
+
+requirements.txt
+pip install -r requirements.txt
+
+
+
+---------------------------------------
+
+
+
+
+gravacao_transcricao_e_assistencia/
+├── .gitignore
+├── requirements.txt
+├── .env                # variáveis de ambiente
+├── idoso.py            # script principal
+├── README.md           # visão geral do projeto
+├── temp/               # arquivos WAV temporários  
+│   └── *.wav
+├── TRANSCRICOES/       # transcrições e análises geradas  
+│   ├── YYYY_MM_DD_HH_MM_SS_microfone_transcricao.txt
+│   ├── YYYY_MM_DD_HH_MM_SS_microfone_analise.txt
+│   └── ...
+└── docs/               # (opcional) documentação complementar
+    └── ...
+
+
+
+
+---------------------------------------
+
+
+
+
+HTTPS - https://github.com/luangwl0125/gravar_geral.git
+
+
+SSH -  git@github.com:luangwl0125/gravar_geral.git
+
+
+criar o repositório gravar_geral no GitHub e enviar seus arquivos:
+
+Crie o repositório no GitHub
+
+Acesse https://github.com/new.
+
+Em Repository name, digite gravar_geral.
+
+Não marque “Initialize this repository with a README” (evita conflitos ao fazer o push inicial) 
+docs.github.com
+.
+
+Clique em Create repository.
+
+Configure o repositório local
+No terminal, posicione-se na pasta do seu projeto (gravacao_transcricao_e_assistencia/ ou pasta desejada) e execute:
+
+bash
+Copiar código
+git init
+git add .
+git commit -m "Initial commit"
+(Esses comandos inicializam o Git, adicionam todos os arquivos e criam o primeiro commit) 
+docs.github.com
+.
+
+Ligação com o repositório remoto
+Copie a URL HTTPS ou SSH do seu novo repo (por ex. https://github.com/seu-usuario/gravar_geral.git) e rode:
+# 1. (se ainda não tiver feito) garante que a branch principal se chame “main”
+git branch -M main
+
+# 2. Adiciona o remoto apontando para o GitHub (sem < >)
+git remote add origin https://github.com/luangwl0125/gravar_geral.git
+
+# 3. Envia o commit inicial para o GitHub
+git push -u origin main
+
+bash
+git push -u origin main
+O -u define origin/main como upstream, facilitando pushes futuros só com git push 
+docs.github.com
+.
+
+Pronto! Seu código estará disponível em https://github.com/seu-usuario/gravar_geral.
+
+
+
+
+
+
+
+
+
+
+Luan, todo workflow básico para sincronizar suas mudanças no IDE com o Git remoto é:
+
+Editar arquivos no IDE
+Faça suas alterações normalmente nos arquivos do projeto.
+
+Verificar o estado dos arquivos
+
+git status
+Isso mostra arquivos modificados, não rastreados e/ou já preparados para commit 
+uidaholib.github.io
+.
+
+Preparar (staging) as alterações
+
+git add .
+ou especifique arquivos individuais em vez de .. Isso coloca as mudanças na “staging area” 
+git-scm.com
+.
+
+Criar o commit
+
+git commit -m "Mensagem descritiva sobre a mudança"
+Isso grava o snapshot no repositório local 
+stackoverflow.com
+.
+
+Atualizar seu branch local
+
+git pull --rebase origin main
+Isso busca e reaplica seus commits sobre o histórico remoto, evitando merges extras 
+rogerdudler.github.io
+.
+
+Resolver conflitos (se houver)
+
+Edite os arquivos conflitantes.
+
+Marque como resolvido: git add <app.py>.
+
+Continue o rebase: git rebase --continue.
+
+Enviar ao repositório remoto
+
+git push origin main
+Suas mudanças agora estarão disponíveis no GitHub ou outro remoto.
+
+Pronto—sempre que alterar algo no IDE, siga esses sete passos para manter seu repositório sincronizado e com histórico limpo.

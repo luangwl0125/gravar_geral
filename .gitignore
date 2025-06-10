@@ -1,0 +1,39 @@
+# Virtual environment
+.venv/
+
+# Ambiente e credenciais
+.env
+.streamlit/secrets.toml
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pastas de build/distribution
+build/
+dist/
+*.egg-info/
+
+# Dependências geradas pelo pip
+pip-wheel-metadata/
+
+# Arquivos temporários
+temp/
+TRANSCRICOES/
+
+# IDEs e editores
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Arquivos de teste/coverage
+.coverage
+htmlcov/
+pytest_cache/
