@@ -19,11 +19,8 @@ import whisper
 import torch
 
 # ——— Configurações iniciais ———
-# Desativa watcher do Streamlit para evitar erros com PyTorch
 os.environ["STREAMLIT_SERVER_ENABLE_FILE_WATCHER"] = "false"
-# Suprime warnings de audioop deprecated
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="audioop")
-# Corrige inspeção de torch.classes
 if hasattr(torch, "classes"):
     torch.classes.__path__ = []
 
@@ -37,7 +34,7 @@ PASTA_TRANSCRICOES = BASE_DIR / "TRANSCRICOES"
 PASTA_TEMP.mkdir(exist_ok=True)
 PASTA_TRANSCRICOES.mkdir(exist_ok=True)
 
-# Clientes e modelos
+# Cliente OpenAI e modelo Whisper local
 client = openai.OpenAI()
 _local_whisper = None
 def get_local_whisper():
@@ -72,16 +69,16 @@ def use_fallback(caminho_audio=None, prompt=None, texto=None):
     """Fallback usando Whisper local"""
     try:
         if caminho_audio:
-            model = get_local_whisper()
-            res = model.transcribe(caminho_audio, language="pt")
+            res = get_local_whisper().transcribe(caminho_audio, language="pt")
             return res["text"], "Análise indisponível (fallback local)"
-        elif texto:
+        if texto:
             return texto, "Análise indisponível (fallback local)"
     except Exception as e:
         st.error(f"Fallback falhou: {e}")
     return "", ""
 
-PROMPT_ANALISE = """\
+PROMPT_ANALISE = (
+"""
 Você é um Assistente de Organização Profissional. Estruture a transcrição em:
 
 - IDENTIFICAÇÃO DO EVENTO  
@@ -95,6 +92,7 @@ Você é um Assistente de Organização Profissional. Estruture a transcrição 
 {}
 #### TRANSCRIÇÃO ####
 """
+)
 
 @handle_openai_error
 def processa_transcricao_chatgpt(texto: str) -> str:
@@ -133,20 +131,17 @@ def transcreve_audio(caminho_audio: str, prompt: str) -> tuple[str, str]:
         st.warning("Erro na API; usando fallback local.")
         texto, analise = use_fallback(caminho_audio, prompt)
     finally:
-        # Cleanup de arquivo temporário
+        # Cleanup de temporário
         if caminho_audio.startswith(tempfile.gettempdir()):
             try: os.remove(caminho_audio)
             except OSError: pass
     return texto, analise
 
-# Estado inicial
-if "transcricao_mic" not in st.session_state:
-    st.session_state |= {
-        "transcricao_mic": "",
-        "analise_mic": "",
-        "gravando_audio": False,
-        "audio_completo": pydub.AudioSegment.empty(),
-    }
+# — Parâmetros de sessão inicial —
+st.session_state.setdefault("transcricao_mic", "")
+st.session_state.setdefault("analise_mic", "")
+st.session_state.setdefault("gravando_audio", False)
+st.session_state.setdefault("audio_completo", pydub.AudioSegment.empty())
 
 @st.cache_data
 def get_ice_servers():
@@ -169,13 +164,13 @@ def salva_transcricao(texto, analise, origem=""):
     (PASTA_TRANSCRICOES / f"{base}_txt.txt").write_text(texto, encoding="utf-8")
     (PASTA_TRANSCRICOES / f"{base}_ana.txt").write_text(analise, encoding="utf-8")
 
+# — Abas do Streamlit —
 def transcreve_tab_mic():
     prompt = st.text_input("Prompt (opcional)", key="pmic")
     btn = "⏹️ Parar" if st.session_state["gravando_audio"] else "🔴 Gravar"
     if st.button(btn):
-        st.session_state["gravando_audio"] ^= True
+        st.session_state["gravando_audio"] = not st.session_state["gravando_audio"]
         if not st.session_state["gravando_audio"]:
-            # salva gravação final
             fn = PASTA_TRANSCRICOES / f"mic_{datetime.now():%Y%m%d_%H%M%S}.wav"
             st.session_state["audio_completo"].export(fn, format="wav")
             st.session_state["audio_completo"] = pydub.AudioSegment.empty()
@@ -188,10 +183,16 @@ def transcreve_tab_mic():
     if not ctx.state.playing and st.session_state["transcricao_mic"]:
         if not st.session_state["analise_mic"]:
             st.write("Gerando análise...")
-            st.session_state["analise_mic"] = processa_transcricao_chatgpt(st.session_state["transcricao_mic"])
+            st.session_state["analise_mic"] = processa_transcricao_chatgpt(
+                st.session_state["transcricao_mic"]
+            )
         st.markdown("**Transcrição:**"); st.write(st.session_state["transcricao_mic"])
         st.markdown("**Análise:**");     st.write(st.session_state["analise_mic"])
-        salva_transcricao(st.session_state["transcricao_mic"], st.session_state["analise_mic"], "mic")
+        salva_transcricao(
+            st.session_state["transcricao_mic"],
+            st.session_state["analise_mic"],
+            "mic",
+        )
         return
 
     placeholder = st.empty()
@@ -213,40 +214,39 @@ def transcreve_tab_mic():
 
         if time.time() - ultimo > 10 and buffer:
             ultimo = time.time()
-            buffer.export(str(PASTA_TEMP / "mic_tmp.wav"), format="wav")
-            txt, _ = transcreve_audio(str(PASTA_TEMP / "mic_tmp.wav"), prompt)
+            tmp = PASTA_TEMP / "mic_tmp.wav"
+            buffer.export(str(tmp), format="wav")
+            txt, _ = transcreve_audio(str(tmp), prompt)
             st.session_state["transcricao_mic"] += txt
             placeholder.write(st.session_state["transcricao_mic"])
             buffer = pydub.AudioSegment.empty()
 
 def _extrai_audio_de_video(file):
     tmp_vid = PASTA_TEMP / "vid_tmp.mp4"
-    with open(tmp_vid, "wb") as f: f.write(file.read())
+    tmp_vid.write_bytes(file.read())
     clip = VideoFileClip(str(tmp_vid))
-    clip.audio.write_audiofile(str(PASTA_TEMP / "vid_tmp.wav"), logger=None)
-    return str(PASTA_TEMP / "vid_tmp.wav")
+    out = PASTA_TEMP / "vid_tmp.wav"
+    clip.audio.write_audiofile(str(out), logger=None)
+    return str(out)
 
 def transcreve_tab_video():
     prompt = st.text_input("Prompt (opcional)", key="pvid")
     vid = st.file_uploader("Vídeo", type=["mp4","mov","avi","mkv","webm"])
     if not vid: return
-    try:
-        wav_in = _extrai_audio_de_video(vid)
-        wav_conv = converter_para_wav(wav_in)
-        txt, ana = transcreve_audio(wav_conv, prompt)
-        st.markdown("**Transcrição:**"); st.write(txt)
-        st.markdown("**Análise:**");     st.write(ana)
-        salva_transcricao(txt, ana, f"vid_{vid.name}")
-    except Exception as e:
-        st.error(f"Erro no vídeo: {e}")
+    wav_in = _extrai_audio_de_video(vid)
+    wav_conv = converter_para_wav(wav_in)
+    txt, ana = transcreve_audio(wav_conv, prompt)
+    st.markdown("**Transcrição:**"); st.write(txt)
+    st.markdown("**Análise:**");     st.write(ana)
+    salva_transcricao(txt, ana, f"vid_{vid.name}")
 
 def transcreve_tab_audio():
     prompt = st.text_input("Prompt (opcional)", key="paud")
     aud = st.file_uploader("Áudio", type=["mp3","wav","m4a","opus","mpeg"])
     if not aud: return
-    caminho = PASTA_TEMP / aud.name
-    caminho.write_bytes(aud.read())
-    wav = converter_para_wav(str(caminho))
+    path = PASTA_TEMP / aud.name
+    path.write_bytes(aud.read())
+    wav = converter_para_wav(str(path))
     txt, ana = transcreve_audio(wav, prompt)
     st.markdown("**Transcrição:**"); st.write(txt)
     st.markdown("**Análise:**");     st.write(ana)
@@ -256,19 +256,17 @@ def transcreve_tab_texto():
     st.write("Envie .txt ou .docx para análise")
     txtfile = st.file_uploader("Texto", type=["txt","docx"])
     if not txtfile: return
-    try:
-        if txtfile.type == "text/plain":
-            txt = txtfile.getvalue().decode("utf-8")
-        else:
-            import docx2txt
-            txt = docx2txt.process(txtfile)
-        ana = processa_transcricao_chatgpt(txt)
-        st.markdown("**Original:**"); st.write(txt)
-        st.markdown("**Análise:**");  st.write(ana)
-        salva_transcricao(txt, ana, f"txt_{txtfile.name}")
-    except Exception as e:
-        st.error(f"Erro ao ler texto: {e}")
+    if txtfile.type == "text/plain":
+        txt = txtfile.getvalue().decode("utf-8")
+    else:
+        import docx2txt
+        txt = docx2txt.process(txtfile)
+    ana = processa_transcricao_chatgpt(txt)
+    st.markdown("**Original:**"); st.write(txt)
+    st.markdown("**Análise:**");  st.write(ana)
+    salva_transcricao(txt, ana, f"txt_{txtfile.name}")
 
+# — Função principal —
 def main():
     st.header("🎙️ Assistente de Organização 🎙️")
     tabs = st.tabs(["Microfone","Vídeo","Áudio","Texto"])
